@@ -1,23 +1,25 @@
 ( function( $, window ){
+	var $window = $(window);
 	$.fn.resizedEvent = function( options ){
-		var dataKey = 'resizedEvent';
 		var that = this;
+		var dataKey = 'resizedEvent';
+
 		var defaults = {
-			breakpoints: { // these correspond to bootstrap's breakpoints
+			breakpoints: { // these correspond to bootstrap's breakpoints by default
 				lg : 1200,
 				md : 992,
 				sm : 768,
 				xs : 480,
 				xxs: 0
 			},
-			interval: 200
+			interval: 100 // throttle speed of resized event
 		};
 		// if its already been initialized, then merge in any new options and halt
 		if( this.data( dataKey ) ){
 			var data = this.data( dataKey );
 			data.settings = $.extend( data.settings, options );
 			this.data( dataKey, data );
-			return;
+			return this;
 		// otherwise, merge options and do all initial setup.
 		} else {
 			var data = {};
@@ -30,19 +32,16 @@
 		var last_width = false;
 		var last_height = false;
 		var last_breakpoint = false;
-		var current_width = this.width();
-		var current_height = this.height();
+		var current_width = this.outerWidth();
+		var current_height = this.outerHeight();
 		var current_breakpoint = getBreakpoint();
 
-		function updateBreakpoint(){
+		function getBreakpoint(){
 			for ( breakpoint in settings.breakpoints ){
 				if ( current_width > settings.breakpoints[ breakpoint ] ){
 					return breakpoint;
 				}
 			}
-		}
-		function getBreakpoint(){
-			return current_breakpoint;
 		}
 		function getWidth(){
 			return current_width ;
@@ -56,44 +55,36 @@
 		function verticalHasChanged(){
 			return last_height !== current_height ;
 		}
-		this.on( 'resize', $.debounce( settings.interval, function(){
+
+		var handlePossibleResize = function(){
 			last_width = current_width;
-			current_width = that.width();
 			last_height = current_height;
-			current_height = that.height();
 			last_breakpoint = current_breakpoint;
-			current_breakpoint = updateBreakpoint();
-			var changed = {
-				w: horizontalHasChanged(),
-				h: verticalHasChanged(),
-				breakpoint: breakpointHasChanged(),
+			current_width = that.outerWidth();
+			current_height = that.outerHeight();
+			current_breakpoint = getBreakpoint();
+			var info = {
+				breakpoint: current_breakpoint,
+				h: current_height,
+				w: current_width,
 				from: {
 					breakpoint: last_breakpoint,
-					width: last_width,
+					h: last_height,
+					w: last_width,
 				},
-				to: {
-					breakpoint: current_breakpoint,
-					width: current_width
+				changed: {
+					w: horizontalHasChanged(),
+					h: verticalHasChanged(),
+					breakpoint: breakpointHasChanged()
 				}
 			};
-			if ( changed.h || changed.w ){ that.trigger( 'resized', changed ); }
-			// convenience events
-			if ( changed.w ){ that.trigger( 'resized-w', changed ); }
-			if ( changed.h ){ that.trigger( 'resized-h', changed ); }
-			if ( changed.breakpoint ){
-				that.trigger( 'resized-breakpoint', changed );
-				that.trigger( 'resized-from-' + changed.from.breakpoint, changed );
-				that.trigger( 'resized-to-' + changed.to.breakpoint, changed );
-				that.trigger( 'resized-' + changed.from.breakpoint + '-to-' + changed.to.breakpoint, changed );
+			if ( info.changed.h || info.changed.w ){
+				that.trigger( 'resized', info );
+				if ( info.changed.w ){ that.trigger( 'resized-w', info ); }
+				if ( info.changed.h ){ that.trigger( 'resized-h', info ); }
 			}
-		} ));
-
-		// handle for all non-window items
-		if ( ! $.isWindow( this ) ){
-			$(window).on( 'resize', $.throttle( settings.interval, function(){
-				that.trigger( 'resize' );
-			} ));
 		}
+		$window.on( 'resize load', $.throttle( settings.interval, handlePossibleResize ) );
 		return this;
 	}
 }( jQuery, window ) );
