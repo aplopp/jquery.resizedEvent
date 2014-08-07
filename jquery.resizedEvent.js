@@ -13,7 +13,6 @@
 		interval: 100 // throttle speed of resized event
 	};
 	var setupResizingOnElement = function( $el, options ){
-		var $el = $(this);
 		// if its already been initialized, then merge in any new options and halt
 		if( $el.data( dataKey ) ){
 			var data = $el.data( dataKey );
@@ -22,9 +21,7 @@
 			return $el;
 		}
 		// otherwise, merge options and do all initial setup.
-		id++;
 		var data = {
-			id: id
 		};
 		var settings = $.extend( defaults, options );
 		data.settings = settings;
@@ -90,8 +87,7 @@
 				if ( info.changed.h ){ $el.triggerHandler( 'resized-h', info ); }
 			}
 		}
-		$window.unbind( 'resize.el-'+data.id );
-		$window.on( 'resize.el-'+data.id, $.throttle( settings.interval, handlePossibleResize ));
+		$el.on( 'resize', $.throttle( settings.interval, handlePossibleResize ));
 		$window.on( 'load', function(){
 			$el.triggerHandler( 'resized-init', getInfoObject() );
 		});
