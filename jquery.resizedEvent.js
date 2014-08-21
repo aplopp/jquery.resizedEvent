@@ -1,145 +1,115 @@
 ( function( $, window ){
-	String.prototype.regexIndexOf = function(regex, startpos) {
-	    var indexOf = this.substring(startpos || 0).search(regex);
-	    return (indexOf >= 0) ? (indexOf + (startpos || 0)) : indexOf;
-	}
 	var $window = $(window);
-	$window.resizedEvent();
-
-	$.fn.fauxTable = function( options ){
-		var that = this;
-		var noop = function(){};
-		var defaults = {
-			cellSelector: '.tb-td',
-			cellInnerSelector: '.inner-container',
-			classesThatCanChange: [ 'active' ],
-			excludeSelector: false,
-			beforeResize: noop,
-			afterResize: noop
+	var id = 0;
+	var dataKey = 'resizedEvent';
+	var defaults = {
+		breakpoints: { // these correspond to bootstrap's breakpoints by default
+			lg : 1200,
+			md : 992,
+			sm : 768,
+			xs : 480,
+			xxs: 0
+		},
+		interval: 100 // throttle speed of resized event
+	};
+	var setupResizingOnElement = function( $el, options ){
+		// if its already been initialized, then merge in any new options and halt
+		if( $el.data( dataKey ) ){
+			var data = $el.data( dataKey );
+			data.settings = $.extend( data.settings, options );
+			$el.data( dataKey, data );
+			return $el;
+		}
+		// otherwise, merge options and do all initial setup.
+		var data = {
 		};
 		var settings = $.extend( defaults, options );
-		if ( typeof settings.classesThatCanChange === 'string' ){
-			settings.classesThatMayChange = [ settings.classesThatMayChange ];
+		data.settings = settings;
+		var api = {};
+		$el.data( dataKey, {
+			settings: settings,
+			api: api
+		});
+		var last_width = false;
+		var last_height = false;
+		var last_breakpoint = false;
+		var current_width = $el.outerWidth();
+		var current_height = $el.outerHeight();
+		var current_breakpoint = getBreakpoint();
+
+		function getBreakpoint(){
+			for ( breakpoint in settings.breakpoints ){
+				if ( current_width > settings.breakpoints[ breakpoint ] ){
+					return breakpoint;
+				}
+			}
+		}
+		function getWidth(){
+			return current_width ;
+		}
+		function breakpointHasChanged(){
+			return last_breakpoint !== current_breakpoint ;
+		}
+		function horizontalHasChanged(){
+			return last_width !== current_width ;
+		}
+		function verticalHasChanged(){
+			return last_height !== current_height ;
+		}
+		var getInfoObject = function(){
+			current_width = $el.outerWidth();
+			current_height = $el.outerHeight();
+			current_breakpoint = getBreakpoint();
+			return {
+				breakpoint: current_breakpoint,
+				h: current_height,
+				w: current_width,
+				from: {
+					breakpoint: last_breakpoint,
+					h: last_height,
+					w: last_width,
+				},
+				changed: {
+					w: horizontalHasChanged(),
+					h: verticalHasChanged(),
+					breakpoint: breakpointHasChanged()
+				}
+			};
+		}
+		var handlePossibleResize = function(){
+			last_width = current_width;
+			last_height = current_height;
+			last_breakpoint = current_breakpoint;
+			var info = getInfoObject();
+			if ( info.changed.h || info.changed.w ){
+				$el.triggerHandler( 'resized', info );
+				if ( info.changed.w ){ $el.triggerHandler( 'resized-w', info ); }
+				if ( info.changed.h ){ $el.triggerHandler( 'resized-h', info ); }
+			}
+		}
+		$window.on( 'resize', $.throttle( settings.interval, handlePossibleResize ));
+		$window.on( 'load', function(){
+			$el.triggerHandler( 'resized-init', getInfoObject() );
+		});
+		api.info = getInfoObject;
+	}
+	var callMethod = function( $el, methodName ){
+		var data;
+		if ( data = $el.data( dataKey )){
+			if ( data.api[ methodName ] ){
+				return data.api[ methodName ]();
+			}
+		}
+		console.warn( 'resizedEvent() has no method "'+methodName+'"');
+		return;
+	}
+	$.fn.resizedEvent = function( options ){
+		if ( typeof( options ) === 'string' ){
+			return callMethod( $(this), options );
 		}
 		this.each( function(){
-	 		var $container = $(this);
- 			var $cells = $(this).children( settings.cellClass );
-
- 			// no cells, stop dead
- 			if ( $cells.size() === 0 ) return;
-
- 			var cellElements = [];
- 			// for each of the cell's children, add their classes to the array
- 			$cells.each( function(){
- 				var $innerContainer = $(this).children( settings.cellInnerSelector );
- 				if( $innerContainer.size() === 0 ){
- 					var $toAlign = $(this).children();
- 				} else {
- 					var $toAlign = $innerContainer.children();
- 				}
- 				if ( settings.excludeSelector ){
- 					$toAlign = $toAlign.filter( ':not('+settings.excludeSelector+')');
- 				}
- 				$toAlign.each( function(){
- 					var classes = $(this).attr('class' );
- 					var allClasses = classes ? $(this).attr('class').split( /\s+/) : [];
- 					var selector = [ $(this).prop('tagName') ];
- 					for( var i in allClasses ){
- 						if ( allClasses[i] && settings.classesThatCanChange.indexOf( allClasses[i] ) === -1 ){
- 							selector.push( allClasses[i]);
- 						}
- 					}
- 					var selector =  selector.join( '.' );
- 					if ( cellElements.indexOf( selector ) === -1 ){
- 						cellElements.push( selector )
- 					}
- 				});
- 			});
- 			function adjustHeights( $toAdjust, height ){
- 				if ( $toAdjust.size() > 1 ){
- 					$toAdjust.height( height );
- 				}
- 			}
- 			function lineUpCells( e, resize ){
- 				settings.beforeResize( $cells, resize );
- 				var elClass, selector, maxHeight;
-				// record the indexes of each linebreak
-				var lineBreaks = [];
-				var index = 0;
-				var cellHeight = 0;
-				$cells.each( function(){
-					if ( $(this).height() > cellHeight ){
-						cellHeight = $(this).height();
-					}
-				});
-				$cells.css({ height: cellHeight });
-				$cells.each( function(){
-					var topPos = $(this).offset().top;
-					if ( topPos !== lastTop ){
-						if ( index !== 0 ){
-							lineBreaks.push( true );
-						} else {
-							lineBreaks.push( false )
-						}
-						lastTop = topPos;
-					} else {
-						lineBreaks.push( false );
-					}
-					index++;
-				});
-				$cells.css({ height: '' });
- 				for( i in cellElements ){
- 					maxHeight = 0;
- 					selector = cellElements[i];
-
- 					var $toAdjust = $();
- 					var lastTop = 0;
- 					var index = -1;
- 					$cells.each( function(){
- 						index++;
-		 				var $innerContainer = $(this).children( settings.cellInnerSelector );
-		 				if( $innerContainer.size() === 0 ){
-		 					var $toAlign = $(this).children( selector );
-		 				} else {
-		 					var $toAlign = $innerContainer.children( selector );
-		 				}
-		 				// if just a tag name
-		 				if ( selector.indexOf( '.' ) === -1 && selector.indexOf( '#') === -1 ){
-			 				for ( j in cellElements ){
-			 					if ( cellElements[j] !== selector ){
-			 						var thisSelector = cellElements[j];
-			 						if ( thisSelector.substr( 0, thisSelector.regexIndexOf(/[#\.]/) ) === selector ){
-			 							$toAlign = $toAlign.not( thisSelector );
-			 						}
-			 					}
-			 				}
-		 				}
-		 				// if no elements to align, return
-		 				if ( $toAlign.size() === 0 ) return;
- 						// return it to natural height
- 						$toAlign.height( '' );
- 						// otherwise, raise maxHeight if necessary
- 						var height = $toAlign.height();
- 						if ( height > maxHeight ){
- 							maxHeight = height;
- 						}
- 						$toAdjust = $toAdjust.add( $toAlign );
-
- 						// if there is a line break
- 						// adjust cells, clear the maxHeight, clear the list of cells to adjust
- 						if ( lineBreaks[ index + 1 ]){
-  							adjustHeights( $toAdjust, maxHeight ); // adjust heights of previous cells
- 							maxHeight = 0; // clear maxHeight
- 							$toAdjust = $(); // and clear
- 							return;
- 						}
- 					});
- 					adjustHeights( $toAdjust, maxHeight ); // adjust heights of any inline cellElements 
- 				}
- 				settings.afterResize( $cells, resize );
- 			}
- 			$container.resizedEvent().on( 'resized-w resized-init', lineUpCells );
- 			lineUpCells();
- 		});
+			setupResizingOnElement($(this), options)
+		});
+		return this;
 	}
 }( jQuery, window ) );
