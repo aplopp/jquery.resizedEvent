@@ -1,0 +1,23 @@
+{
+  "name": "jquery.resizedEvent",
+  "version": "1.0",
+  "homepage": "https://github.com/aplopp/jquery.resizedEvent",
+  "authors": [
+    "Anthony Plopper <anthony@anthonyplopper.com>"
+  ],
+  "dependencies": {
+    "jquery": "~1.11",
+    "jquery-throttle-debounce": "*"
+  },
+  "description": "Throttles the window resize event, and then triggers events based on width/height changes.",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "_inc",
+    "test",
+    "tests"
+  ]
+}
